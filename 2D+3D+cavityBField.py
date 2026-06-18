@@ -8,73 +8,26 @@ import matplotlib.pyplot as plt
 import magpylib as magpy
 # from magpylib.current import Loop
 
-def cavity_coil(I=100, config="H", plot_obj=False):
+#------------------------------------------ 2D MOT B-field setup ------------------------------------------#
 
-    if config=="H":
-        curr_up = -I
-        curr_down = -I
-    else:
-        if config=="AH":
-            curr_up = -I
-            curr_down = I
-        else:
-            raise ValueError("Invalid 3D MOT Coil Configuration")
+# Br = 1.42  # Tesla
+# mu0 = 4*np.pi*1e-7
+# M = Br / mu0
 
-    # Turns
-    T = 9
-    # Windings
-    W = 8
+# magnet_1 = magpy.magnet.Cuboid(
+#     position = (-5.3*0.01, -20*0.01, -4*0.01), dimension = (2*0.01, 5.5*0.01, 2*0.01), magnetization = (0, -M, 0))
+# magnet_2 = magpy.magnet.Cuboid(
+#     position = (-5.3*0.01, -20*0.01, 4*0.01), dimension = (2*0.01, 5.5*0.01, 2*0.01), magnetization = (0, -M, 0))
+# magnet_3 = magpy.magnet.Cuboid(
+#     position = (5.3*0.01, -20*0.01, -4*0.01), dimension = (2*0.01, 5.5*0.01, 2*0.01), magnetization = (0, M, 0))
+# magnet_4 = magpy.magnet.Cuboid(
+#     position = (5.3*0.01, -20*0.01, 4*0.01), dimension = (2*0.01, 5.5*0.01, 2*0.01), magnetization = (0, M, 0))
 
-    # Spacing between windings
-    s = 5.588 # in mm
-    
-    # Width of coil
-    L = T * (6) # in mm
+# magnets = magpy.Collection(magnet_1, magnet_2, magnet_3, magnet_4)
 
-    # Diameter
-    # d - Inner diameter
-    d = 273.05 # in mm
+#------------------------------------------ 3D MOT B-field setup ------------------------------------------#
 
-    # D - Outer diameter
-    D = d + 2 * W * s # in mm
-    D = 370.84 # in mm
-
-    # Error
-    e = 0 # in mm
-
-    # Position of coils
-    z_1 = 92.6225 + e
-    z_2 = -z_1
-
-    coil = magpy.Collection()
-
-    for i in range(0, 2*T, 2):
-        for n in range(W):
-
-            # Upper Coils
-            winding1 = magpy.current.Circle(
-                current = curr_up,
-                diameter = d + (2*n + 1) * s,
-                position = (0, 0, z_1 + (s)*((i - (T-1))/2)),
-            )
-
-            coil.add(winding1)
-
-            # Lower Coils
-            winding2 = magpy.current.Circle(
-                current = curr_down,
-                diameter = d + (2*n + 1) * s,
-                position = (0, 0, z_2 + (s)*((i - (T-1))/2)),
-            )
-
-            coil.add(winding2)
-
-    if plot_obj:
-        coil.show(backend='plotly')
-
-    return coil
-
-def mot3d_coil(I=100, config="AH", plot_obj=False):
+def mot3d_coil(I=35, config="AH", plot_obj=False):
 
     if config=="H":
         curr_up = -I
@@ -114,14 +67,16 @@ def mot3d_coil(I=100, config="AH", plot_obj=False):
 
     coil = magpy.Collection()
 
-    for i in range(0, 2*T, 2):
+    # Note: Unlike the cavity coil function, the 3D MOT function starts populating turns from the bottom of the top coil, and the top of the bottom coil.
+
+    for i in range(0, T):
         for n in range(W):
 
             # Upper Coils
             winding1 = magpy.current.Circle(
                 current = curr_up,
                 diameter = d + (2*n + 1) * s,
-                position = (-248.3, 0, z_1 + (s)*((i - (T-1))/2)),
+                position = (0, 0, z_1 + i*s),
             )
 
             coil.add(winding1)
@@ -130,7 +85,7 @@ def mot3d_coil(I=100, config="AH", plot_obj=False):
             winding2 = magpy.current.Circle(
                 current = curr_down,
                 diameter = d + (2*n + 1) * s,
-                position = (-248.3, 0, z_2 + (s)*((i - (T-1))/2)),
+                position = (0, 0, z_2 - i*s),
             )
 
             coil.add(winding2)
@@ -140,22 +95,100 @@ def mot3d_coil(I=100, config="AH", plot_obj=False):
 
     return coil
 
+#------------------------------------------ Cavity coil B-field setup ------------------------------------------#
+
+def cavity_coil(I=30, config="H", plot_obj=False):
+
+    if config=="H":
+        curr_up = -I
+        curr_down = -I
+    else:
+        if config=="AH":
+            curr_up = -I
+            curr_down = I
+        else:
+            raise ValueError("Invalid 3D MOT Coil Configuration")
+
+    # Turns
+    T = 9
+    # Windings
+    W = 8
+
+    # Spacing between windings
+    s = 5.588 # in mm
+    
+    # Width of coil
+    L = T * (6) # in mm
+
+    # Diameter
+    # d - Inner diameter
+    d = 273.05 # in mm
+
+    # D - Outer diameter
+    D = d + 2 * W * s # in mm
+    D = 370.84 # in mm
+
+    # Error
+    e = 0 # in mm
+
+    # Position of coils
+    z_1 = 92.6225 + e
+    z_2 = -z_1
+
+    coil = magpy.Collection()
+
+    # Note: Unlike the 3D MOT coil function, the cavity coil function starts populating turns from the middle of both coils.
+
+    for i in range(0, 2*T, 2):
+        for n in range(W):
+
+            # Upper Coils
+            winding1 = magpy.current.Circle(
+                current = curr_up,
+                diameter = d + (2*n + 1) * s,
+                position = (248.3, 0, z_1 + (s)*((i - (T-1))/2)),
+            )
+
+            coil.add(winding1)
+
+            # Lower Coils
+            winding2 = magpy.current.Circle(
+                current = curr_down,
+                diameter = d + (2*n + 1) * s,
+                position = (248.3, 0, z_2 + (s)*((i - (T-1))/2)),
+            )
+
+            coil.add(winding2)
+
+    if plot_obj:
+        coil.show(backend='plotly')
+
+    return coil
+
+#------------------------------------------ Coil objects ------------------------------------------#
+
 cavitycoil = cavity_coil(config="H", plot_obj=False)
 motcoil = mot3d_coil(config="AH", plot_obj=False)
+
+#------------------------------------------ Coil + magnets visualization ------------------------------------------#
 
 # combined = magpy.Collection()
 # combined.add(cavitycoil)
 # combined.add(motcoil)
+# #combined.add(magnets)
 # combined.show(backend= 'plotly')
+
+
+#------------------------------------------ Simulating B-fields along particular axes ------------------------------------------#
 
 xline = np.linspace(-300, 300, 1000)  # ±1 m
 line = np.array([(x, 0, 0) for x in xline])
 
-B_line = cavitycoil.getB(line)  # shape (N, 3)
+B_line = motcoil.getB(line) + cavitycoil.getB(line)  # shape (N, 3)
 Bx_line, By_line, Bz_line = np.moveaxis(B_line, -1, 0)
 Bmag = np.sqrt(Bx_line**2 + By_line**2 + Bz_line**2) * 1e4  # T→G
 
-Bx_G = Bx_line*1e7
+Bx_G = Bx_line*1e7 # Since in the function, we calculate B-fields scaled up by 1000 (m instead of mm) and in the units of T, we multiply 10^4 * 10^3 = 10^7
 By_G = By_line*1e7
 Bz_G = Bz_line*1e7
 x_cm = xline/10
@@ -163,6 +196,8 @@ x_cm = xline/10
 dBx_dx = np.gradient(Bx_G, x_cm)
 dBy_dx = np.gradient(By_G, x_cm)
 dBz_dx = np.gradient(Bz_G, x_cm)
+
+#------------------------------------------ Plot B-fields ------------------------------------------#
 
 plt.figure()
 # plt.plot(xline * 100, Bmag)  # m→cm
@@ -176,6 +211,24 @@ plt.grid()
 
 plt.legend(loc='best', fontsize=10)
 plt.show()
+
+#------------------------------------------ Plot B-field gradient ------------------------------------------#
+
+# plt.figure()
+# # plt.plot(xline * 100, Bmag)  # m→cm
+# plt.plot(x_cm, dBx_dx, 'red', label=r'$dB_x/dx$')
+# plt.plot(x_cm, dBy_dx, 'blue', label=r'$dB_y/dx$')
+# plt.plot(x_cm, dBz_dx, 'green', label=r'$dB_z$/dx')
+# plt.xlabel("x (cm)")
+# plt.ylabel("dB/dx (G/cm)")
+# plt.title("B Field Gradients along the conveyor axis")
+# plt.grid()
+
+# plt.legend(loc='best', fontsize=10)
+# plt.show()
+
+
+#------------------------------------------ Streamplot stuff ------------------------------------------#
 
 # import matplotlib.pyplot as plt
 
