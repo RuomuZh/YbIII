@@ -46,17 +46,10 @@ def mot3d_coil(I=35, config="AH", plot_obj=False):
 
     # Spacing between windings
     s = 1.37 * 0.001 # in mm
-    
-    # # Width of coil
-    # L = T * (2) # in mm
 
     # Diameter
     # d - Inner diameter
     d = 66.167 * 0.001 # in mm
-
-    # D - Outer diameter
-    D = d + 2 * W * s # in mm
-    #D = 370.84 # in mm
 
     # Error
     e = 0 # in mm
@@ -116,17 +109,10 @@ def cavity_coil(I=30, config="H", plot_obj=False):
 
     # Spacing between windings
     s = 5.588 * 0.001 # in mm
-    
-    # # Width of coil
-    # L = T * (6) # in mm
 
     # Diameter
     # d - Inner diameter
     d = 273.05 * 0.001 # in mm
-
-    # D - Outer diameter
-    D = d + 2 * W * s # in mm
-    D = 370.84 * 0.001 # in mm
 
     # Error
     e = 0 # in mm
@@ -179,28 +165,27 @@ motcoil = mot3d_coil(config="AH", plot_obj=False)
 # combined.show(backend= 'plotly')
 
 
-#------------------------------------------ Simulating B-fields along particular axes ------------------------------------------#
+#------------------------------------------ Simulating B-fields along x-axis ------------------------------------------#
 
-xline = np.linspace(-0.3, 0.3, 1000)  # ±1 m
-line = np.array([(x, 0, 0) for x in xline])
+# xline = np.linspace(-0.3, 0.3, 1000)  # ±1 m
+# line = np.array([(x, 0, 0) for x in xline])
 
-B_line = motcoil.getB(line) + cavitycoil.getB(line) + magnets.getB(line)  # shape (N, 3)
-Bx_line, By_line, Bz_line = np.moveaxis(B_line, -1, 0)
-Bmag = np.sqrt(Bx_line**2 + By_line**2 + Bz_line**2) * 1e4  # T→G
+# B_line = motcoil.getB(line) + cavitycoil.getB(line) + magnets.getB(line)  # shape (N, 3)
+# Bx_line, By_line, Bz_line = np.moveaxis(B_line, -1, 0)
+# Bmag = np.sqrt(Bx_line**2 + By_line**2 + Bz_line**2) * 1e4  # T→G
 
-Bx_G = Bx_line*1e4 # Since in the function, we calculate B-fields scaled up by 1000 (m instead of mm) and in the units of T, we multiply 10^4 * 10^3 = 10^7
-By_G = By_line*1e4
-Bz_G = Bz_line*1e4
-x_cm = xline*100
+# Bx_G = Bx_line*1e4
+# By_G = By_line*1e4
+# Bz_G = Bz_line*1e4
+# x_cm = xline*100
 
-dBx_dx = np.gradient(Bx_G, x_cm)
-dBy_dx = np.gradient(By_G, x_cm)
-dBz_dx = np.gradient(Bz_G, x_cm)
+# dBx_dx = np.gradient(Bx_G, x_cm)
+# dBy_dx = np.gradient(By_G, x_cm)
+# dBz_dx = np.gradient(Bz_G, x_cm)
 
-#------------------------------------------ Plot B-fields ------------------------------------------#
+#------------------------------------------ Plot B-fields along x-axis ------------------------------------------#
 
 # plt.figure()
-# # plt.plot(xline * 100, Bmag)  # m→cm
 # plt.plot(x_cm, Bx_G, 'red', label=r'$B_x$')
 # plt.plot(x_cm, By_G, 'blue', label=r'$B_y$')
 # plt.plot(x_cm, Bz_G, 'green', label=r'$B_z$')
@@ -212,21 +197,66 @@ dBz_dx = np.gradient(Bz_G, x_cm)
 # plt.legend(loc='best', fontsize=10)
 # plt.show()
 
-#------------------------------------------ Plot B-field gradient ------------------------------------------#
+#------------------------------------------ Plot B-field gradient along x-axis ------------------------------------------#
+
+# plt.figure()
+# # plt.plot(xline * 100, Bmag)  # m→cm
+# plt.plot(x_cm, dBx_dx, 'red', label=r'$dB_x/dx$')
+# plt.plot(x_cm, dBy_dx, 'blue', label=r'$dB_y/dx$')
+# plt.plot(x_cm, dBz_dx, 'green', label=r'$dB_z$/dx')
+# plt.xlabel("x (cm)")
+# plt.ylabel("dB/dx (G/cm)")
+# plt.title("B Field Gradients along the conveyor axis")
+# plt.grid()
+
+# plt.legend(loc='best', fontsize=10)
+# plt.show()
+
+#------------------------------------------ Simulating B-fields along y-axis ------------------------------------------#
+
+yline = np.linspace(-0.3, 0.3, 1000)  # ±1 m
+line = np.array([(0, y, 0) for y in yline])
+
+B_line = motcoil.getB(line) + cavitycoil.getB(line) + magnets.getB(line)  # shape (N, 3)
+Bx_line, By_line, Bz_line = np.moveaxis(B_line, -1, 0)
+Bmag = np.sqrt(Bx_line**2 + By_line**2 + Bz_line**2) * 1e4  # T→G
+
+Bx_G = Bx_line*1e4
+By_G = By_line*1e4
+Bz_G = Bz_line*1e4
+y_cm = yline*100
+
+dBx_dy = np.gradient(Bx_G, y_cm)
+dBy_dy = np.gradient(By_G, y_cm)
+dBz_dy = np.gradient(Bz_G, y_cm)
+
+#------------------------------------------ Plot B-fields along y-axis ------------------------------------------#
 
 plt.figure()
-# plt.plot(xline * 100, Bmag)  # m→cm
-plt.plot(x_cm, dBx_dx, 'red', label=r'$dB_x/dx$')
-plt.plot(x_cm, dBy_dx, 'blue', label=r'$dB_y/dx$')
-plt.plot(x_cm, dBz_dx, 'green', label=r'$dB_z$/dx')
-plt.xlabel("x (cm)")
-plt.ylabel("dB/dx (G/cm)")
-plt.title("B Field Gradients along the conveyor axis")
+plt.plot(y_cm, Bx_G, 'red', label=r'$B_x$')
+plt.plot(y_cm, By_G, 'blue', label=r'$B_y$')
+plt.plot(y_cm, Bz_G, 'green', label=r'$B_z$')
+plt.xlabel("y (cm)")
+plt.ylabel("B (G)")
+plt.title("B Field along the push beam axis")
 plt.grid()
 
 plt.legend(loc='best', fontsize=10)
 plt.show()
 
+#------------------------------------------ Plot B-field gradient along y-axis ------------------------------------------#
+
+plt.figure()
+plt.plot(y_cm, dBx_dy, 'red', label=r'$dB_x/dy$')
+plt.plot(y_cm, dBy_dy, 'blue', label=r'$dB_y/dy$')
+plt.plot(y_cm, dBz_dy, 'green', label=r'$dB_z$/dy')
+plt.xlabel("y (cm)")
+plt.ylabel("dB/dy (G/cm)")
+plt.title("B Field Gradients along the push beam axis")
+plt.grid()
+
+plt.legend(loc='best', fontsize=10)
+plt.show()
 
 #------------------------------------------ Streamplot stuff ------------------------------------------#
 
