@@ -1,62 +1,96 @@
 import numpy as np
 import matplotlib.pyplot as plt
+
+# from src.functions.math import func as mathf
+# from src.functions.optics import func as optf
+# from src.constants import const
+
 import magpylib as magpy
+# from magpylib.current import Loop
 
-from scipy.spatial.transform import Rotation as R
+#------------------------------------------ 2D MOT B-field setup ------------------------------------------#
 
-from atomsmltr.environment import PlaneWaveLaserBeam
-from atomsmltr.environment import GaussianLaserBeam
-from atomsmltr.environment import ConstantForce
-from atomsmltr.atoms import Ytterbium
-from atomsmltr.simulation import Configuration, RK4
-from atomsmltr.environment import (
-    Vertical,
-    Horizontal,
-    CircularLeft,
-    CircularRight,
-    Linear,
-    Vector,
-)
-from atomsmltr.environment.fields.magnetic.magpylib import MagpylibWrapper
-
-# - setup atom
-atom = Ytterbium()
-# get transition, to help setting up lasers
-main = atom.trans["main"] # 399 nm transition to 1P1
-intercombination = atom.trans["intercombination"] # 556 nm transition to 3P1
-
-# - setup laser
-laser_1 = GaussianLaserBeam(
-    wavelength=intercombination.wavelength,
-    waist=2e-3,
-    waist_position=(0, 0, 0),
-    direction=(0, -np.sin(0), np.cos(0)),
-)
-laser_1.set_power_from_I(intercombination.Isat) # set power to reach Isat
-laser_1.polarization = Vertical()
-laser_1.tag = "las1"
-
-# - create the magpylib object (in this case 2D MOT magnets)
 Br = 1.42  # Tesla
 mu0 = 4*np.pi*1e-7
 M = Br / mu0
+
 magnet_1 = magpy.magnet.Cuboid(
-    position = (-5.3*0.01, 0, -4*0.01), dimension = (2*0.01, 5.5*0.01, 2*0.01), magnetization = (0, -M, 0))
+    position = (-5.3*0.01, -24*0.01, 0), dimension = (2*0.01, 2*0.01, 5.5*0.01), magnetization = (0, 0, M))
 magnet_2 = magpy.magnet.Cuboid(
-    position = (-5.3*0.01, 0, 4*0.01), dimension = (2*0.01, 5.5*0.01, 2*0.01), magnetization = (0, -M, 0))
+    position = (-5.3*0.01, -16*0.01, 0), dimension = (2*0.01, 2*0.01, 5.5*0.01), magnetization = (0, 0, M))
 magnet_3 = magpy.magnet.Cuboid(
-    position = (5.3*0.01, 0, -4*0.01), dimension = (2*0.01, 5.5*0.01, 2*0.01), magnetization = (0, M, 0))
+    position = (5.3*0.01, -24*0.01, 0), dimension = (2*0.01, 2*0.01, 5.5*0.01), magnetization = (0, 0, -M))
 magnet_4 = magpy.magnet.Cuboid(
-    position = (5.3*0.01, 0, 4*0.01), dimension = (2*0.01, 5.5*0.01, 2*0.01), magnetization = (0, M, 0))
+    position = (5.3*0.01, -16*0.01, 0), dimension = (2*0.01, 2*0.01, 5.5*0.01), magnetization = (0, 0, -M))
 
 magnets = magpy.Collection(magnet_1, magnet_2, magnet_3, magnet_4)
 
-# wrap it up
-mag_field_2D_MOT = MagpylibWrapper(magnets)
-mag_field_2D_MOT.tag = "2D MOT coils"
+#------------------------------------------ 3D MOT B-field setup ------------------------------------------#
 
-# - create the magpylib object (in this case 3D MOT coils)
-def mot3d_coil(I=30, config="H", plot_obj=False):
+def mot3d_coil(I=35, config="AH", plot_obj=False):
+
+    if config=="H":
+        curr_up = -I
+        curr_down = -I
+    else:
+        if config=="AH":
+            curr_up = -I-11
+            curr_down = I
+        else:
+            raise ValueError("Invalid 3D MOT Coil Configuration")
+
+    # Turns
+    T = 3
+    # Windings
+    W = 2
+
+    # Spacing between windings
+    s = 1.37 * 0.001 # in mm
+
+    # Diameter
+    # d - Inner diameter
+    d = 66.167 * 0.001 # in mm
+
+    # Error
+    e = 0 # in mm
+
+    # Position of coils
+    z_1 = 17.78 * 0.001 + e
+    z_2 = -z_1
+
+    coil = magpy.Collection()
+
+    # Note: Unlike the cavity coil function, the 3D MOT function starts populating turns from the bottom of the top coil, and the top of the bottom coil.
+
+    for i in range(0, T):
+        for n in range(W):
+
+            # Upper Coils
+            winding1 = magpy.current.Circle(
+                current = curr_up,
+                diameter = d + (2*n + 1) * s,
+                position = (0, 0, z_1 + i*s),
+            )
+
+            coil.add(winding1)
+
+            # Lower Coils
+            winding2 = magpy.current.Circle(
+                current = curr_down,
+                diameter = d + (2*n + 1) * s,
+                position = (0, 0, z_2 - i*s),
+            )
+
+            coil.add(winding2)
+
+    if plot_obj:
+        coil.show(backend='plotly')
+
+    return coil
+
+#------------------------------------------ Cavity coil B-field setup ------------------------------------------#
+
+def cavity_coil(I=30, config="H", plot_obj=False):
 
     if config=="H":
         curr_up = -I
@@ -74,27 +108,22 @@ def mot3d_coil(I=30, config="H", plot_obj=False):
     W = 8
 
     # Spacing between windings
-    s = 5.588e-3 # in mm
-    
-    # Width of coil
-    L = T * (6e-3) # in mm
+    s = 5.588 * 0.001 # in mm
 
     # Diameter
     # d - Inner diameter
-    d = 273.05e-3 # in mm
-
-    # D - Outer diameter
-    D = d + 2 * W * s # in mm
-    D = 370.84e-3 # in mm
+    d = 273.05 * 0.001 # in mm
 
     # Error
     e = 0 # in mm
 
     # Position of coils
-    y_1 = -92.6225e-3 + e
-    y_2 = -y_1
+    z_1 = 92.6225 * 0.001 + e
+    z_2 = -z_1
 
     coil = magpy.Collection()
+
+    # Note: Unlike the 3D MOT coil function, the cavity coil function starts populating turns from the middle of both coils.
 
     for i in range(0, 2*T, 2):
         for n in range(W):
@@ -103,8 +132,7 @@ def mot3d_coil(I=30, config="H", plot_obj=False):
             winding1 = magpy.current.Circle(
                 current = curr_up,
                 diameter = d + (2*n + 1) * s,
-                position = (0, (y_1 + (s)*((i - (T-1))/2)), 1),
-                orientation=R.from_euler('x', 90, degrees=True)
+                position = (0.2483, 0, z_1 + (s)*((i - (T-1))/2)),
             )
 
             coil.add(winding1)
@@ -113,8 +141,7 @@ def mot3d_coil(I=30, config="H", plot_obj=False):
             winding2 = magpy.current.Circle(
                 current = curr_down,
                 diameter = d + (2*n + 1) * s,
-                position = (0, (y_2 + (s)*((i - (T-1))/2)), 1),
-                orientation=R.from_euler('x', 90, degrees=True)
+                position = (0.2483, 0, z_2 + (s)*((i - (T-1))/2)),
             )
 
             coil.add(winding2)
@@ -124,83 +151,168 @@ def mot3d_coil(I=30, config="H", plot_obj=False):
 
     return coil
 
-coil = mot3d_coil(config="AH", plot_obj=False)
+#------------------------------------------ Coil objects ------------------------------------------#
 
-# wrap it up
-mag_field_3D_MOT = MagpylibWrapper(coil)
-mag_field_3D_MOT.tag = "3D MOT coils"
+cavitycoil = cavity_coil(config="H", plot_obj=False)
+motcoil = mot3d_coil(config="AH", plot_obj=False)
 
-# Visualization to check magnet geometry and placement
-# magnets_final = magpy.Collection(magnets, coil)
-# magnets_final.show(backend='plotly')
+#------------------------------------------ Coil + magnets visualization ------------------------------------------#
 
-# zline = np.linspace(0, 0.2, 1000)  # ±10 cm
-# line = np.array([(0, 0, z) for z in zline])
+# combined = magpy.Collection()
+# combined.add(cavitycoil)
+# combined.add(motcoil)
+# combined.add(magnets)
+# combined.show(backend= 'plotly')
 
-# B_line = magnets.getB(line)   # shape (N, 3)
+
+# #------------------------------------------ Simulating B-fields along x-axis ------------------------------------------#
+
+# xline = np.linspace(-0.1, 0.1, 1000)  # ±1 m
+# line = np.array([(x, 0, 0) for x in xline])
+
+# B_line = motcoil.getB(line) + cavitycoil.getB(line) + magnets.getB(line)  # shape (N, 3)
 # Bx_line, By_line, Bz_line = np.moveaxis(B_line, -1, 0)
 # Bmag = np.sqrt(Bx_line**2 + By_line**2 + Bz_line**2) * 1e4  # T→G
 
+# Bx_G = Bx_line*1e4
+# By_G = By_line*1e4
+# Bz_G = Bz_line*1e4
+# x_cm = xline*100
+
+# dBx_dx = np.gradient(Bx_G, x_cm)
+# dBy_dx = np.gradient(By_G, x_cm)
+# dBz_dx = np.gradient(Bz_G, x_cm)
+
+# #------------------------------------------ Plot B-fields along x-axis ------------------------------------------#
+
 # plt.figure()
-# # plt.plot(xline * 100, Bmag)  # m→cm
-# plt.plot(zline * 100, Bx_line*1e4)
-# plt.plot(zline * 100, By_line*1e4)
-# plt.plot(zline * 100, Bz_line*1e4)
+# plt.plot(x_cm, Bx_G, 'red', label=r'$B_x$')
+# plt.plot(x_cm, By_G, 'blue', label=r'$B_y$')
+# plt.plot(x_cm, Bz_G, 'green', label=r'$B_z$')
 # plt.xlabel("x (cm)")
 # plt.ylabel("B (G)")
-# plt.title("B along physical x-axis (y = 0, z = 0)")
+# plt.title("B Field along the conveyor axis")
 # plt.grid()
+
+# plt.legend(loc='best', fontsize=10)
 # plt.show()
 
-# let's add gravity, pointing along +y
-m = Ytterbium().mass  # kg
-g = 9.81  # m/s^2
-grav_force = (0,  m * g, 0)
-gravity = ConstantForce(field_value=grav_force, tag="gravity")
+# #------------------------------------------ Plot B-field gradient along x-axis ------------------------------------------#
 
-# - config
-config = Configuration()
-config.atom = atom
-config += laser_1, gravity, mag_field_2D_MOT
-config.add_atomlight_coupling("las1", "intercombination", 0) # Arguments: laser = "las1", transition = intercombination", detuning = - or +200 * intercombination.Gamma
-# - simulation
-sim = RK4(config=config)
-t = np.linspace(0, 0.25, 6000) # timesteps for integration
-u0 = (0, 0, 0, 0, 0, 0) # atom starts with vz=100m/s
-res = sim.integrate(u0, t)
+# plt.figure()
+# # plt.plot(xline * 100, Bmag)  # m→cm
+# plt.plot(x_cm, dBx_dx, 'red', label=r'$dB_x/dx$')
+# plt.plot(x_cm, dBy_dx, 'blue', label=r'$dB_y/dx$')
+# plt.plot(x_cm, dBz_dx, 'green', label=r'$dB_z$/dx')
+# plt.xlabel("x (cm)")
+# plt.ylabel("dB/dx (G/cm)")
+# plt.title("B Field Gradients along the conveyor axis")
+# plt.grid()
 
-# plot
-fix, axes = plt.subplots(3, 2, tight_layout=True)
+# plt.legend(loc='best', fontsize=10)
+# plt.show()
 
-axes[0, 0].plot(res.t * 1e3, res.y[0])
-axes[0, 0].set_ylabel("x␣(m)")
-axes[0, 1].plot(res.t * 1e3, res.y[3])
-axes[0, 1].set_ylabel("vx␣(m/s)")
+#------------------------------------------ Simulating B-fields along y-axis ------------------------------------------#
 
-axes[1, 0].plot(res.t * 1e3, res.y[1])
-axes[1, 0].set_ylabel("y␣(m)")
-axes[1, 1].plot(res.t * 1e3, res.y[4])
-axes[1, 1].set_ylabel("vy␣(m/s)")
+yline = np.linspace(-0.3, 0.3, 1000)  # ±1 m
+line = np.array([(0, y, 0) for y in yline])
 
-axes[2, 0].plot(res.t * 1e3, res.y[2])
-axes[2, 0].set_ylabel("z␣(m)")
-axes[2, 1].plot(res.t * 1e3, res.y[5])
-axes[2, 1].set_ylabel("vz␣(m/s)")
+B_line = motcoil.getB(line) + cavitycoil.getB(line) + magnets.getB(line)  # shape (N, 3)
+Bx_line, By_line, Bz_line = np.moveaxis(B_line, -1, 0)
+Bmag = np.sqrt(Bx_line**2 + By_line**2 + Bz_line**2) * 1e4  # T→G
 
-diff = res.y[1] - 0.002
-sign_changes = np.where(np.diff(np.sign(diff)))[0]
-print(res.t[sign_changes]*1e3)
+Bx_G = Bx_line*1e4
+By_G = By_line*1e4
+Bz_G = Bz_line*1e4
+y_cm = yline*100
 
-for ax in axes.flat:
-    ax.axvline(x=res.t[sign_changes]*1e3, color='r', linestyle='--')
-    ax.set(xlabel="t␣(ms)")
+dBx_dy = np.gradient(Bx_G, y_cm)
+dBy_dy = np.gradient(By_G, y_cm)
+dBz_dy = np.gradient(Bz_G, y_cm)
 
-y = np.interp(6e-3, res.t, res.y[1])
-vy = np.interp(6e-3, res.t, res.y[4])
-z = np.interp(6e-3, res.t, res.y[2])
-vz = np.interp(6e-3, res.t, res.y[5])
+#------------------------------------------ Plot B-fields along y-axis ------------------------------------------#
 
-print(y, vy, z, vz)
+plt.figure()
+plt.plot(y_cm, Bx_G, 'red', label=r'$B_x$')
+plt.plot(y_cm, By_G, 'blue', label=r'$B_y$')
+plt.plot(y_cm, Bz_G, 'green', label=r'$B_z$')
+plt.xlabel("y (cm)")
+plt.ylabel("B (G)")
+plt.title("B Field along the push beam axis")
+plt.grid()
 
+plt.legend(loc='best', fontsize=10)
 plt.show()
 
+#------------------------------------------ Plot B-field gradient along y-axis ------------------------------------------#
+
+plt.figure()
+plt.plot(y_cm, dBx_dy, 'red', label=r'$dB_x/dy$')
+plt.plot(y_cm, dBy_dy, 'blue', label=r'$dB_y/dy$')
+plt.plot(y_cm, dBz_dy, 'green', label=r'$dB_z$/dy')
+plt.xlabel("y (cm)")
+plt.ylabel("dB/dy (G/cm)")
+plt.title("B Field Gradients along the push beam axis")
+plt.grid()
+
+plt.legend(loc='best', fontsize=10)
+plt.show()
+
+#------------------------------------------ Streamplot stuff ------------------------------------------#
+
+# import matplotlib.pyplot as plt
+
+# def plot_plane(plane="xy", min=[-300, -300], max=[300, 300], res=100, title="Magnetic Field Streamplot (XY plane)", save_plot=False, fname="mot3d_ah_i_200a", dir="results\\"):
+
+#     fig, axs = plt.subplots(1, 1, figsize=(26,10))
+
+#     # create grid
+#     ax1_ts = np.linspace(min[0], max[0], res)
+#     ax2_ts = np.linspace(min[0], max[1], res)
+#     comp = [0, 1]
+
+#     if plane=="xy":
+#         grid = np.array([[(x, y, 0) for x in ax1_ts] for y in ax2_ts])
+#         comp = [0, 1]
+#     else:
+#         if plane=="yz":
+#             grid = np.array([[(0, y, z) for y in ax1_ts] for z in ax2_ts])
+#             comp = [1, 2]
+#         else:
+#             if plane=="xz":
+#                 grid = np.array([[(x, 0, z) for x in ax1_ts] for z in ax2_ts])
+#                 comp = [0, 2]
+#             else:
+#                 raise ValueError("Invalid Plane")
+
+#     # compute and plot field of coil
+#     B = magpy.getB(coil, grid) *1e2*1e4 # mT to G
+#     Bamp = np.linalg.norm(B, axis=2)
+#     Bamp /= np.amax(Bamp)
+
+#     sp = axs.streamplot(
+#         grid[:,:,comp[0]], grid[:,:,comp[1]], B[:,:,comp[0]], B[:,:,comp[1]],
+#         density=2,
+#         color=np.where(np.linalg.norm(B, axis=2) > 100, 1000, 10*np.linalg.norm(B, axis=2)),
+#         linewidth=np.sqrt(Bamp)*3,
+#         cmap='jet',
+#     )
+
+#     # figure styling
+#     axs.set(
+#         title='Magnetic field of coils [G]',
+#         xlabel=plane[0] + '-position [mm]',
+#         ylabel=plane[1] + '-position [mm]',
+#         aspect=1,
+#     )
+
+#     plt.colorbar(sp.lines, ax=axs, label='[G]')
+
+#     if save_plot:
+#         plt.savefig(dir + fname + '.png', bbox_inches='tight')
+
+#     plt.tight_layout()
+#     plt.show()
+
+
+# plot_plane(plane="xy", fname="mot3d_ah_i_200a_xy", save_plot=False)
