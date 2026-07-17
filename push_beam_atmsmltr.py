@@ -264,7 +264,7 @@ config += laser_1, gravity, mag_field_3D_MOT, mag_field_2D_MOT
 config += las_z_up, las_z_down, las_x_plus, las_x_minus, las_y_plus, las_y_minus
 
 # # Set a red-detuning relative to the intercombination transition
-detuning_push = 0
+detuning_push = -intercombination.Gamma/2  # red-detuning for pushing
 config.add_atomlight_coupling("las1", "intercombination", detuning_push) # Arguments: laser = "las1", transition = intercombination", detuning = detuning_push
 
 # Tie all 6 lasers to the intercombination transition simultaneously
